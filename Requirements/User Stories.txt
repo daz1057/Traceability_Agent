@@ -1,0 +1,185 @@
+content = """
+### Epic: AI Agent for Problem–Story Traceability v=1
+
+#### BR-1000: Normalize heterogeneous “problems” into canonical problems-to-solve
+- As an Analyst, I want raw workshop/interview statements classified by expression type and rewritten into a canonical problem schema so that I can compare them consistently to user stories.
+- Acceptance Criteria:
+  - Given a raw statement, when processed, then it is labeled as exactly one of: solution_request, stated_need, action_description, failure_to_act, pain_statement.
+  - And the statement is transformed to: “<Persona> cannot achieve <Desired Outcome> because of <Barrier>”.
+  - And the output includes: persona, desired outcome, barrier, value intent, 3–7 domain terms.
+  - And an evidence strength score is assigned: 0=vague, 1=implicit, 2=clear+authoritative.
+  - And the original text and all derived fields are persisted with a timestamp.
+
+#### BR-1001: Parse and abstract user stories into comparable facets
+- As an Analyst, I want each user story parsed into persona, capability, and value so that stories and problems can be compared on intent rather than keywords.
+- Acceptance Criteria:
+  - Given a user story in any “As a/I want/So that” completeness, when parsed, then it yields persona_s, action_capability_s, outcome_s, value_intent_s, 3–7 domain terms.
+  - And a governance signal is derived: 0=none, 1=implicit, 2=explicit (policy/roles/SLAs/lineage/audit/RACI).
+  - And outputs are persisted with a timestamp and the original story text.
+
+#### BR-1002: Generate candidate pairs efficiently
+- As a System, I want to pre-filter plausible problem–story pairs so that the scoring step is tractable and focused.
+- Acceptance Criteria:
+  - Candidate pairs are generated when any of the following holds:
+    - Persona families overlap (exact or closely related).
+    - Domain/theme terms overlap via lenient matching.
+    - Governance stories pair with governance problems across domains when policy/control is the need.
+  - The pre-filter is configurable and produces a reproducible candidate list.
+
+#### BR-1003: Score conceptual alignment across seven dimensions
+- As an Analyst, I want each candidate pair scored on multi-dimensional criteria so that confidence reflects deep intent and causality.
+- Acceptance Criteria:
+  - For each pair, the system outputs scores (0–2) for:
+    - D1 Persona alignment
+    - D2 Action/Capability alignment (conceptual/synonym level)
+    - D3 Causal coverage (root/symptom/none → 2/1/0)
+    - D4 Granularity fit
+    - D5 Value/Intent alignment
+    - D6 Governance/Policy alignment
+    - D7 Evidence strength transfer (from problem)
+  - Total score and confidence band are computed: High (≥10), Medium (6–9), Low (1–5), None (0).
+  - A one-sentence causal rationale is produced explaining the link judgment.
+
+#### BR-1004: Determine coverage (Full, Partial, None) using residual facets
+- As an Analyst, I want coverage labeled accurately so that I know whether a single story closes the problem or only part of it.
+- Acceptance Criteria:
+  - Facet flags are computed: covers_persona, covers_capability, covers_causal_root, covers_value, covers_governance, covers_granularity.
+  - Residual coverage level is derived:
+    - 2 if capability + causal_root + value are all covered.
+    - 1 if any two are covered.
+    - 0 otherwise.
+  - Coverage label rules:
+    - Full if High confidence AND Residual=2 AND Causal coverage=2.
+    - Partial if ≥Medium confidence and not Full.
+    - None otherwise.
+
+#### BR-1005: Produce graph-friendly outputs with full provenance
+- As a Platform User, I want normalized nodes and scored edges exported so that I can build a traceability matrix and visualize links.
+- Acceptance Criteria:
+  - Outputs include:
+    - Problems_Normalised with canonical fields and evidence.
+    - Stories_Parsed with facets and governance signal.
+    - Edges with D1–D7, total, confidence band, coverage label, facet flags, rationale, timestamps.
+    - Coverage_Summary per problem (counts of High/Medium links, residual level, unresolved facets).
+  - Source files remain unchanged; all outputs are new artifacts with stable IDs.
+
+#### BR-1006: Short, deterministic prompts for micro-judgments
+- As an Engineer, I want minimal prompts that force the model through specific steps so that outcomes are stable and auditable.
+- Acceptance Criteria:
+  - Separate prompts exist for: problem canonicalization, story parsing, causal test (root/symptom/none), value-intent alignment (direct/tangential/misaligned).
+  - Each prompt returns strict JSON or a single-word class as specified.
+  - Prompts are versioned and stored with runs.
+
+#### BR-1007: Human-in-the-loop review targeting
+- As an Analyst, I want only meaningful edges escalated so that my time is spent on borderline decisions.
+- Acceptance Criteria:
+  - Auto-flag edges with total score in a configurable borderline band (e.g., 8–10).
+  - Auto-flag problems with residual coverage < 2 after processing all stories.
+  - Auto-flag any High-confidence edges where evidence strength=0.
+  - Reviewed edges can be approved, demoted, or rejected and then locked to prevent overwrite.
+
+#### BR-1008: Configuration and weighting control
+- As a Product Owner, I want to tune filters and weights without code changes so that the agent can learn from feedback.
+- Acceptance Criteria:
+  - Dimension weights, candidate filters, confidence thresholds, and governance rules are externalized (e.g., JSON/YAML).
+  - Changes are versioned; each run records the config version used.
+  - A/B testing of weight sets is supported across batches.
+
+#### BR-1009: Provenance, audit, and reproducibility
+- As a Compliance Auditor, I want full traceability of decisions so that results can be defended and reproduced.
+- Acceptance Criteria:
+  - Every edge stores: source texts, normalized fields, sub-scores, prompts used, model versions, config version, timestamps, and reviewer overrides.
+  - Re-running with the same inputs and config produces identical outputs (modulo non-deterministic model seeds, which are controlled or logged).
+
+#### BR-1010: Idempotent export to existing traceability matrices
+- As a PM/BA, I want exports to update my matrix without duplication so that my downstream tools stay clean.
+- Acceptance Criteria:
+  - Exports use stable problem/story IDs.
+  - Upsert behavior: new edges added, removed edges marked inactive, unchanged edges untouched.
+  - Locked human overrides are preserved across reruns unless source text changes.
+
+#### BR-1011: Policy for vision/decision/assumption-type problems
+- As an Analyst, I want aspiration-level items treated cautiously so that confidence reflects implementability.
+- Acceptance Criteria:
+  - Problems categorized as vision/decision/assumption are capped at Medium confidence unless matched to implementable stories.
+  - The cap is configurable.
+
+#### BR-1012: Cross-domain governance matching
+- As a Governance Lead, I want governance stories to satisfy policy problems across technical domains so that policy coverage is not missed.
+- Acceptance Criteria:
+  - Candidate pairing allows governance stories to match governance problems irrespective of technical theme when policy/control is the core need.
+  - Governance alignment (D6) is emphasized in such matches via configurable weight.
+
+#### BR-1013: Abstraction-level compensation
+- As an Analyst, I want the system to recognize when a story is one component of a broader problem so that Partial coverage is positively identified.
+- Acceptance Criteria:
+  - Granularity fit (D4) and residual coverage logic classify component stories as Partial even with strong alignment in other dimensions.
+  - Summary highlights remaining facets needed for Full coverage.
+
+#### BR-1014: Batch processing with stable latency
+- As an Operator, I want processing in small, parallelizable batches so that runs are predictable and scalable.
+- Acceptance Criteria:
+  - Problems and stories are processed in batches of a configurable size.
+  - Failures in a batch are retried; successful artifacts are cached to avoid recomputation.
+
+#### BR-1015: Explainable rationales for every decision
+- As a Reviewer, I want concise human-readable rationales so that I can accept or reject edges quickly.
+- Acceptance Criteria:
+  - Each edge includes a single-sentence rationale referencing the canonical barrier and the story capability’s effect on it, and the intended value alignment.
+  - Rationales avoid generic phrasing and cite the specific conceptual link.
+
+#### BR-1016: Versioning and rollback of outputs
+- As a Platform Admin, I want to version artifacts and roll back if needed so that changes are controlled.
+- Acceptance Criteria:
+  - Each output dataset is versioned with immutable snapshots.
+  - A rollback command can restore a prior version of the edges and summaries.
+
+#### BR-1017: Security and role-based access
+- As an Admin, I want role-based access to review and configuration functions so that governance is enforced.
+- Acceptance Criteria:
+  - Roles: Viewer, Reviewer, Admin.
+  - Only Admin can change configuration/weights; Reviewer can lock/unlock edges; Viewer can read outputs.
+
+#### BR-1018: Metrics and continuous improvement
+- As a Product Owner, I want acceptance metrics so that we can tune the system.
+- Acceptance Criteria:
+  - Track reviewer acceptance rates for suggested Medium edges.
+  - Report precision/recall at High confidence against a gold set of manually labeled pairs.
+  - Provide trend dashboards across runs.
+
+#### BR-1019: Determinism controls
+- As an Engineer, I want control over model randomness so that outputs are stable.
+- Acceptance Criteria:
+  - Model temperature/top_p (or equivalents) are set to deterministic values for micro-prompts.
+  - Seeds or request IDs are logged; retries reuse the same settings.
+
+#### BR-1020: Identities and locking behavior
+- As an Analyst, I want stable identities and override protection so that my judgments persist.
+- Acceptance Criteria:
+  - Problem and story IDs are treated as authoritative identifiers.
+  - Locked edges are never auto-modified; changes to underlying texts trigger an “unlock suggestion” rather than a silent overwrite.
+
+---
+
+### Non-functional requirements (v=1)
+
+- Performance: Process 1,000 problems × 1,000 stories within agreed SLA using candidate pre-filtering and batching.
+- Reliability: Recover gracefully from partial failures; all stages are idempotent with cached intermediates.
+- Auditability: 100% of edges include provenance, config version, and rationale.
+- Usability: Review UI surfaces only flagged items and unresolved facets; one-click accept/demote/reject; lock/unlock controls.
+
+---
+
+### Out-of-scope for v=1 (explicitly)
+
+- Editing or “hygiene fixes” to source files.
+- Auto-generation of acceptance criteria for stories.
+- Automatic creation of new stories or rewriting problems (beyond internal canonicalization for matching).
+- Integration-specific adapters beyond CSV/JSON exports.
+"""
+
+file_name = "traceability_agent_user_stories_v1.txt"
+with open(file_name, "w", encoding="utf-8") as f:
+    f.write(content)
+
+print(f"Created {file_name}")

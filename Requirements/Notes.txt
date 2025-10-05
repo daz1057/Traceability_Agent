@@ -1,0 +1,238 @@
+Here’s a self-contained operating spec for an AI agent that emulates your human-grade reasoning to build a traceability matrix between “problems” and “user stories,” without referencing any specific dataset. It assumes your source files may have gaps or inconsistencies, and you do not change them. The agent must do the work through its own reasoning and outputs.
+
+Mission
+
+Ingest heterogeneous problem statements and existing user stories. Normalize problems to a canonical “problem-to-solve” form, abstract intent on both sides, evaluate conceptual and causal alignment, and output links (edges) with confidence bands and coverage labels. Minimize human review by flagging only borderline or risky links and preserving full provenance for audit.
+
+Static configuration (load at startup)
+Canonical problem schema: cannot achieve because of .
+Canonical story schema: As a , I want , so that .
+Expression types for pre-normalization: solution_request, stated_need, action_description, failure_to_act, pain_statement.
+Confidence bands by total score: High (≥10), Medium (6–9), Low (1–5), None (0).
+Full vs Partial rule: Full only if Causal_Coverage = 2 and Residual_Coverage = 2; otherwise Partial if confidence ≥ Medium; else None.
+Optional weights (if using weighted scoring): Persona 1.0, Action/Capability 2.0, Causal 3.0, Granularity 1.0, Value/Intent 2.0, Governance/Policy 1.0, Evidence Strength 1.0.
+Input reading rules (no hygiene edits)
+Problems: read as-is; rely only on the available fields describing the problem text, stakeholder/role, and any theme/category metadata that exist.
+Stories: read as-is; rely on the user story text; acceptance criteria/rationale/links may be empty.
+Do not fix typos, casing, or missing fields; do not reformat source files. All normalization occurs in the agent’s internal representations.
+Processing stages (mirror your human reasoning)
+Pre-normalization of problems
+Classify the original phrasing into one expression_type: solution_request, stated_need, action_description, failure_to_act, or pain_statement.
+Translate into canonical “problem-to-solve” schema:
+Persona: derive from explicit role fields if present; otherwise infer conservatively from the text; otherwise use the stakeholder type as proxy.
+Desired Outcome: functional outcome implied by the text (not necessarily stated).
+Barrier: the root constraint preventing the outcome (organizational, process, or technical).
+Extract facets:
+persona_p, outcome_p, barrier_p, domain_terms_p[] (short phrases/keywords), value_intent_p (business value implied by solving the problem).
+Assign evidence_strength_p (0–2):
+2 = clear, concrete pain and/or authoritative stakeholder; 1 = implicit/medium clarity; 0 = vague/vision-level.
+Story parsing and abstraction
+Parse the story pattern “As a , I want , so that .”
+If any clause is missing, infer conservatively from the text; do not fabricate specifics beyond reasonable synonyms.
+Extract facets:
+persona_s, action_capability_s (short phrase), outcome_s (functional change delivered), value_intent_s (business value), domain_terms_s[].
+Detect governance_signal_s (0–2):
+2 = explicit policy/roles/SLAs/lineage/audit/RACI; 1 = implicit governance; 0 = none.
+Candidate pairing (efficient pre-filter) Create candidate (Problem, Story) pairs if any of the following holds:
+Persona families overlap (exact or closely related roles).
+Theme/domain overlap is apparent via lenient term matching (e.g., matching/duplicates/AI; lineage/audit; quality/rules; hierarchy/relationships; performance/SLA; security/RBAC).
+Governance stories can pair with governance problems even across technical domains when policy/control needs are clear.
+Scoring rubric per candidate pair For each candidate, compute seven subscores (0–2), plus rationales:
+D1 Persona alignment
+2: same/compatible families; 1: adjacent stakeholders; 0: unrelated.
+D2 Action/Capability alignment (synonym/concept level, not keywords)
+2: capability directly enables the problem’s intended action or removes the barrier via an equivalent concept; 1: adjacent/supporting; 0: unrelated.
+D3 Causal coverage
+2: capability neutralizes the root barrier; 1: mitigates a symptom; 0: no effect.
+D4 Granularity fit
+2: similar abstraction; 1: story is one component of a broader problem; 0: mismatched level.
+D5 Value/Intent alignment
+2: business value directly satisfies the problem’s need; 1: tangential; 0: misaligned.
+D6 Governance/Policy alignment
+2: story establishes/enforces policy/controls required by the problem; 1: implicit support; 0: none.
+D7 Evidence strength transfer
+Copy evidence_strength_p; higher evidence strengthens link confidence.
+
+Compute totals and labels:
+
+total_score = sum(D1..D7) → confidence_band: High (≥10), Medium (6–9), Low (1–5), None (0).
+Facet coverage flags (true/false):
+covers_persona = D1 == 2
+covers_capability = D2 ≥ 1
+covers_causal_root = D3 == 2
+covers_value = D5 ≥ 1
+covers_governance = D6 ≥ 1
+covers_granularity = D4 ≥ 1
+Residual_coverage:
+2 if covers_capability AND covers_causal_root AND covers_value
+1 if any two of those are true
+0 otherwise
+Coverage label:
+Full if High AND Residual_coverage = 2 AND D3 = 2
+Partial if confidence ≥ Medium and not Full
+None otherwise
+Store a one-sentence causal_rationale explaining why the capability addresses (or doesn’t) the barrier and value.
+Outputs (do not alter source files)
+
+Generate new artefacts for downstream use:
+
+Problems_Normalised.csv
+PR_ID (or problem identifier), expression_type, canonical_problem, persona_p, outcome_p, barrier_p, domain_terms_p, value_intent_p, evidence_strength_p
+Stories_Parsed.csv
+BR_ID (or story identifier), persona_s, action_capability_s, outcome_s, value_intent_s, domain_terms_s, governance_signal_s
+Edges.csv
+PR_ID, BR_ID, D1..D7, total_score, confidence_band, coverage_label (Full/Partial/None), facet_flags_json, causal_rationale, timestamp
+Coverage_Summary.csv
+PR_ID, num_edges_high, num_edges_medium, residual_coverage_level, unresolved_facets (list: persona/capability/causal/value/governance/granularity)
+
+Optional: Persist as a graph (Problems, Stories, Edges) in your preferred store; keep the same fields.
+
+Prompts (short, deterministic, stepwise)
+
+Use separate prompts to force the model through your cognitive steps. Keep per-item prompts compact; batch small sets to stay within context.
+
+Problem pre-normalization (classification + canonicalization)
+
+System: You convert heterogeneous statements into canonical problem-to-solve form.
+User: Classify the following text as one of [solution_request, stated_need, action_description, failure_to_act, pain_statement]. Then output JSON fields: expression_type, canonical_problem (“ cannot achieve because of ”), persona_p, outcome_p, barrier_p, value_intent_p, domain_terms_p[], evidence_strength_p (2 explicit+authoritative, 1 implicit, 0 vague). Text: “{problem_text}”. Stakeholder: “{stakeholder_or_role}”. Theme: “{theme_or_category}”.
+
+Story parsing
+
+System: You extract persona, capability, and value from user stories even when acceptance criteria are blank.
+User: Parse this story of the form “As a , I want , so that ”. Output JSON: persona_s, action_capability_s, outcome_s, value_intent_s, domain_terms_s[], governance_signal_s (2 explicit governance, 1 implicit, 0 none). Story: “{story_text}”. Additional context (optional): “{rationale_or_notes}”.
+
+Causal coverage micro-judgment
+
+System: You judge whether a capability removes a barrier (root), mitigates a symptom, or is unrelated.
+User: Problem barrier: “{barrier_p}”. Story capability: “{action_capability_s}”. Respond with exactly one word: root, symptom, or none.
+
+Value intent alignment (optional if using embeddings)
+
+System: You compare business intents beyond literal wording.
+User: Problem value: “{value_intent_p}”. Story value: “{value_intent_s}”. Classify: direct, tangential, or misaligned.
+Matching policy nuances
+Allow conceptual synonym mapping across different phrasings; do not require keyword overlap.
+Accept abstraction level shifts: a story may cover part of a broader problem; that is Partial by design.
+Prioritize governance matches for policy/control problems even when technology differs.
+For vision/decision/assumption-type problems, cap confidence at Medium unless the story is enforceable/implementable.
+Review targeting (human-in-the-loop)
+
+Flag only items that merit attention:
+
+Edges with total score in a borderline band (e.g., 8–10).
+Problems whose residual coverage < 2 after all candidate stories.
+Any High-confidence edge where evidence_strength_p = 0 (force review).
+
+All other edges auto-accept to maximize analyst leverage.
+
+Provenance and audit
+
+Store every intermediate object:
+
+Original problem text and metadata.
+Canonicalized problem JSON (with expression type and evidence strength).
+Parsed story JSON.
+Subscores, rationale, and final labels per edge.
+Configuration version used for the run.
+Integration into traceability workflows
+Export accepted edges to your existing traceability matrix format.
+Use stable identifiers for problems and stories so exports are idempotent (upsert-only).
+Preserve manual adjustments by “locking” reviewed edges so re-runs don’t overwrite decisions unless source text changes.
+
+This spec compels the agent to follow your actual human reasoning: normalize messy inputs into a canonical problem form, interpret intent on both sides, match on concepts and causality (not words), account for abstraction-level differences, and produce confidence- and coverage-aware links with full provenance.
+
+Perfect — that’s the missing upstream step in your mental workflow.
+What you’re describing is something all good analysts do tacitly but almost never write down: normalising messy human expressions of “problems” into a canonical “problem-to-solve” form in your head before even comparing them to stories.
+
+Let me capture that explicitly into your thought process:
+
+🧠 Pre‑Normalization Step: “What kind of thing am I actually hearing?”
+
+When raw inputs come from workshops/interviews:
+
+They’re often not problems at all in their phrasing:
+Problem as a solution request → “We need a dashboard.” (Actual problem: they lack visibility/monitoring.)
+Problem phrased as a need → “I want to be able to upload faster.” (Underlying issue: inefficiency in current upload flow.)
+Problem as an action description → “Right now, we re‑enter data into two systems.” (Underlying issue: duplication, wasted effort, risk of error.)
+Problem as a failure/can’t perform → “Clerks can’t run reports without IT.” (Underlying issue: lack of autonomy, reporting bottleneck.)
+Problem as pain/feeling → “It’s so frustrating when it times out.” (Underlying issue: system instability impacting productivity).
+⚙️ What You Do Mentally Here
+
+Classify the expression type (solution / need / action / failure / pain).
+
+Strip away the form → “Okay, ignore whether they said ‘need,’ ‘solution,’ or ‘pain’…”
+
+Abstract into canonical “problem to solve” schema:
+
+<Persona> cannot achieve <Desired Outcome> because of <Barrier>.
+
+This gives you the anchor problem statement you’ll later link to stories.
+
+You only carry forward this canonical abstraction — the messy original phrasing is remembered as evidence/context, but the analysis only proceeds from the cleaned version.
+
+🔑 Why This Matters
+It means that before matching problems ⇔ stories, you’ve already done a semantic normalisation pass internally, converting heterogeneous human utterances into structured “problems.”
+LLMs and code fail because they take the raw phrasing literally. They don’t recognise “We need a dashboard” as shorthand for “We have no visibility of performance metrics.” You do that translation instantly.
+So: your actual thought process has one extra layer between input and comparison: the mental problem normaliser.
+
+Now your overall workflow looks like this:
+
+Extract raw statements (interviews/workshops).
+Normalise: Detect type (solution / need / action / failure / pain) → Translate into canonical “problem to solve” form.
+Abstract & interpret problem intent.
+Abstract & interpret user story intent.
+Map synonyms/concepts (don’t care about literal words).
+Check causal coverage (does story resolve root barrier?).
+Check granularity fit (level of abstraction aligned?).
+Check value alignment (does outcome deliver on underlying need?).
+Aggregate confidence → High/Medium/Low.
+Determine coverage → Full/Partial/None.
+
+✅ That’s the full human‑grade reasoning loop you’re running internally.
+
+Would you like me now to sketch the scoring rubric as a table based on these dimensions (including the pre‑normalisation step), so you could literally hand it to a dev or use it to build an LLM “scaffold chain” that forces the model to step through your reasoning instead of shortcutting?
+
+Great — now that we’ve got your real reasoning loop written out, here’s a sketched scoring rubric as an explicit table. Think of it as a framework that mirrors how your brain steps through the analysis, but with numbers so it can be tested, taught, and eventually scaffolded to an LLM or scoring script.
+
+🧩 Problem ↔ Story Matching Rubric
+Step / Dimension	What You Do Mentally	Scoring Levels	Notes
+0. Pre‑Normalization	Detect if input is phrased as solution / need / action / failure / pain. Translate to canonical schema: <Persona> cannot achieve <Desired Outcome> because of <Barrier>.	Pass/Fail (1 = successfully reframed, 0 = ambiguous)	This is foundational. If not reframed correctly, no reliable match is possible.
+1. Context Alignment	Quick “same ballpark?” gut check (domain, topic).	0 = unrelated domain;1 = vaguely related;2 = clearly same process/domain	Fast filter stage.
+2. Persona Alignment	Compare role in problem vs role in story.	0 = no overlap;1 = related but not same;2 = explicit match	Broader persona categories count as partial.
+3. Action / Capability Alignment	Match user activity/verb in problem intent vs story capability. Consider synonyms & functional intent, not words.	0 = unrelated;1 = adjacent / supporting action;2 = direct action coverage	E.g. “submit invoice” ↔ “validate invoice” = 1.
+4. Causal Coverage	Ask: If story delivered, does it neutralise the barrier?	0 = no coverage;1 = mitigates a symptom only;2 = directly resolves root cause	Core of Full/Partial/None decision.
+5. Granularity Fit	Are problem and story on comparable abstraction levels?	0 = misaligned levels;1 = story only chips at part of broad problem;2 = matched granularity	Helps decide Partial match.
+6. Value/Intent Alignment	Compare interpreted outcome of problem vs story’s “so that …” value.	0 = different or opposed intents;1 = tangential/secondary benefit;2 = directly aligned value	This is where you read “between the lines.”
+7. Residual Coverage	Check if any facets of the problem remain unsolved after story considered.	0 = major gaps remain;1 = partial facets covered;2 = all critical facets covered	Helps judge Full vs. Partial.
+🧮 Aggregation Logic
+High confidence (7–12 points) → Story is a strong or full match.
+Medium confidence (4–6 points) → Some alignment, likely Partial match.
+Low confidence (1–3 points) → Weak overlap, probably discard.
+No match (0 points) → Different universe.
+
+Special rule:
+
+Full Match only if Causal Coverage = 2 and Residual Coverage = 2.
+Otherwise, even if confidence high, classify as Partial.
+📌 Example Worked Through
+
+Problem (normalized): “Accounts payable clerks cannot reconcile supplier invoices because duplicates go unnoticed.”
+Story: “As a finance team member, I want the system to reject duplicate invoice numbers so that overpayments are prevented.”
+
+Scoring:
+
+Context = 2 (same finance domain)
+Persona = 1 (clerk vs finance team, close but not exact)
+Action = 2 (reconcile ↔ reject = strong coverage)
+Causal = 2 (removes root cause)
+Granularity = 2 (narrow vs narrow)
+Value/Intent = 2 (accuracy + prevention aligned)
+Residual coverage = 2 (solves whole duplicate issue)
+Total = 13 (cap at 12) → High confidence, Full match.
+
+✅ This rubric does two things:
+
+Externalises your brain’s nuanced matching. Each “gut feel” becomes a scored dimension.
+Gives a scaffold for LLM/code workflows. Instead of asking “Does this story solve the problem?” you ask the model seven micro‑questions and combine the scores.
+
+Would you like me to now turn this rubric into a prototype scoring framework in Python (with inputs as two text strings) so you could start experimenting with automated scoring + thresholds, while still leaving room for your expert review on borderline cases?

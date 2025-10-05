@@ -1,0 +1,12 @@
+X-axis (Time): Progress over days or weeks spent working on an art piece.
+Y-axis (Creative Output Quality): The perceived quality or satisfaction with the art created.
+
+Graph Trend: A fluctuating line that overall moves upward, showing several dips (moments of self-doubt or perceived failure), but a consistent rise in creative output quality over time.
+
+Key labels on graph:
+- Early frustration dips labeled "I’m not good enough"
+- Midway peaks tagged "Breakthrough moments"
+- Occasional valleys marked "Perfectionism paralysis"
+
+This line graph debunks the limiting belief that "If my art isn’t perfect immediately, I’m a failure." Instead, it illustrates that creativity grows with time despite setbacks, and perfectionism is a natural but conquerable hurdle in the art journey.
+
