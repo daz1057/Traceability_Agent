@@ -1,0 +1,3 @@
+problem_id,text,stakeholder,theme
+PR-1,"Risk analysts struggle to trace model decisions to source data which makes it hard to satisfy regulatory audits.","Risk Analyst","Governance"
+PR-2,"Product managers need faster pairing between customer pain points and delivery stories to prioritise work.","Product Manager","Prioritisation"
