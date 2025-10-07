@@ -49,33 +49,35 @@ def parse_story(story: RawStory) -> ParsedStory:
 
     persona = "Stakeholder"
     capability = story.text.strip()
-    outcome = story.text.strip()
-    value_intent = story.text.strip()
+    functional_outcome = story.text.strip()
+    business_value = story.text.strip()
 
     if match:
         persona = match.group("persona").strip()
         capability = match.group("capability").strip()
-        outcome = match.group("outcome").strip() if match.group("outcome") else capability
-        value_intent = outcome
+        functional_outcome = (
+            match.group("outcome").strip() if match.group("outcome") else capability
+        )
+        business_value = functional_outcome
     elif "i need" in story.text.lower():
         need_match = re.search(r"i need to ([^.,]+)", story.text, flags=re.IGNORECASE)
         if need_match:
             capability = need_match.group(1).strip()
-            outcome = capability
-            value_intent = capability
+            functional_outcome = capability
+            business_value = capability
 
-    domain_terms = iter_domain_terms(keyphrase_candidates(f"{capability} {outcome}"))
+    domain_terms = iter_domain_terms(keyphrase_candidates(f"{capability} {functional_outcome}"))
     governance = governance_signal(story.text)
 
     return ParsedStory(
         story_id=story.story_id,
+        raw_text=story.text,
         persona=persona,
-        action_capability=capability,
-        outcome=outcome,
-        value_intent=value_intent,
+        capability=capability,
+        functional_outcome=functional_outcome,
+        business_value=business_value,
         domain_terms=domain_terms,
         governance_signal=governance,
-        raw_text=story.text,
         metadata=story.metadata,
     )
 
