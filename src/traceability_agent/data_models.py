@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 from dataclasses import dataclass, field
-from datetime import datetime
 from typing import Dict, Iterable, List, Optional
 
 
@@ -33,18 +32,23 @@ class NormalisedProblem:
     """Problem converted into the canonical schema."""
 
     problem_id: str
-    expression_type: str
-    canonical_problem: str
+    raw_text: str
+    utterance_type: str
     persona: str
     desired_outcome: str
     barrier: str
-    domain_terms: List[str]
     value_intent: str
+    domain_terms: List[str]
     evidence_strength: int
-    raw_text: str
     stakeholder: Optional[str] = None
     theme: Optional[str] = None
     metadata: Dict[str, str] = field(default_factory=dict)
+
+    @property
+    def canonical_statement(self) -> str:
+        """Return the canonical intent statement."""
+
+        return f"{self.persona} cannot achieve {self.desired_outcome} because of {self.barrier}."
 
 
 @dataclass(slots=True)
@@ -52,42 +56,42 @@ class ParsedStory:
     """User story parsed into comparable facets."""
 
     story_id: str
+    raw_text: str
     persona: str
-    action_capability: str
-    outcome: str
-    value_intent: str
+    capability: str
+    functional_outcome: str
+    business_value: str
     domain_terms: List[str]
     governance_signal: int
-    raw_text: str
     metadata: Dict[str, str] = field(default_factory=dict)
 
 
 @dataclass(slots=True)
-class EdgeScore:
+class ScoredEdge:
     """Alignment score between a problem and a story."""
 
     problem_id: str
     story_id: str
-    d_scores: Dict[str, int]
+    scores: Dict[str, int]
     total_score: int
     confidence_band: str
+    facet_coverage: Dict[str, bool]
     coverage_label: str
-    facet_flags: Dict[str, bool]
-    residual_coverage: int
     causal_rationale: str
-    timestamp: datetime
+    provenance: Dict[str, object]
     flags: List[str] = field(default_factory=list)
 
 
 @dataclass(slots=True)
 class CoverageSummary:
-    """Summary of coverage for a given problem."""
+    """Summary of coverage and review decisions for a given problem."""
 
     problem_id: str
-    num_edges_high: int
-    num_edges_medium: int
-    residual_coverage_level: int
+    best_confidence: str
+    best_coverage: str
     unresolved_facets: List[str]
+    escalate: bool
+    escalate_reasons: List[str]
 
 
 def iter_domain_terms(terms: Iterable[str]) -> List[str]:

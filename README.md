@@ -4,12 +4,13 @@ Match the problems in a project to the user stories.
 
 ## Overview
 
-This repository contains a lightweight, fully deterministic Python implementation of the traceability agent described in `Requirements/Notes.txt`. The pipeline performs four major steps:
+This repository contains a lightweight, fully deterministic Python implementation of the traceability agent described in `Requirements/Notes.txt`. The pipeline performs five major stages:
 
-1. **Problem normalisation** – raw problem statements are classified by expression type and rewritten into the canonical `"<Persona> cannot achieve <Desired Outcome> because of <Barrier>"` form while extracting supporting facets.
-2. **Story parsing** – user stories are parsed into persona, capability, value intent, domain terms, and a governance signal so they can be compared conceptually to problems.
-3. **Pair scoring** – candidate problem/story pairs are generated when personas, domains, or governance themes overlap, then scored across the seven decision dimensions (D1–D7) with confidence bands and coverage labels.
-4. **Reporting** – normalised nodes, scored edges, and coverage summaries are exported to CSV artefacts that can be consumed by downstream traceability matrices.
+1. **Problem pre-normalisation** – raw problem statements are classified by utterance type and rewritten into the canonical `"<Persona> cannot achieve <Desired Outcome> because of <Barrier>"` form while extracting supporting facets.
+2. **Story parsing** – user stories are parsed into persona, capability, functional outcome, business value, domain terms, and a governance signal so they can be compared conceptually to problems.
+3. **Candidate pairing** – problem/story pairs are proposed when persona families, domain terms, or governance themes overlap so that only plausible links are scored.
+4. **Pair scoring** – each candidate is scored across the seven rubric dimensions with deterministic heuristics, producing subscores, confidence bands, causal rationales, and coverage labels.
+5. **Review & reporting** – outputs include normalised problems, parsed stories, scored edges (with provenance), and coverage summaries that flag escalation scenarios when coverage is incomplete or evidence is weak.
 
 All heuristics are rule-based to guarantee reproducibility and remain faithful to the operating specification.
 
